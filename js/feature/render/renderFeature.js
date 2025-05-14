@@ -203,6 +203,7 @@ function renderAminoAcidSequenceAligned(
     const aaColors = ['rgb(124,124,204)', 'rgb(12, 12, 120)'];
     const oChromStarts = feature.oChromStarts.split(',').map(s => parseInt(s, 10));
     const oSequence = feature.oSequence;
+    const proteinLength = oSequence.length;
 
     ctx.save();
 
@@ -212,14 +213,12 @@ function renderAminoAcidSequenceAligned(
         IGVGraphics.fillText(ctx, aminoAcidLetter, xs + (width - aminoAcidLetterWidth) / 2, y - 4, { fillStyle: '#ffffff' });
     };
 
-    const doPaint = (start, end, aminoAcidLetter, colorToggle, isMismatch, isRedundant) => {
+    const doPaint = (start, end, aminoAcidLetter, colorToggle, isMismatch, isRemainder) => {
         const xs = Math.round((start - bpStart) / bpPerPixel);
         const xe = Math.round((end - bpStart) / bpPerPixel);
         const width = xe - xs;
 
-        ctx.fillStyle = isRedundant
-            ? 'rgba(180,180,180,0.5)'
-            : (aminoAcidLetter === 'M' && proteinOffset === 0 ) ? '#83f902'
+        ctx.fillStyle =(aminoAcidLetter === 'M' && proteinOffset === 0) ? '#83f902'
             : (aminoAcidLetter === 'STOP') ? '#ff2101'
             : isMismatch ? '#ffcc00'
             : aaColors[colorToggle];
@@ -237,60 +236,97 @@ function renderAminoAcidSequenceAligned(
         }
     };
 
-    let codonBaseRemainder = 0; // How many bases we already accumulated toward current codon
+    let codonBaseRemainder = 0;
     let proteinOffset = 0;
 
-    for (let i = 0; i < feature.exons.length; i++) {
+    const exonIndices = (strand === '+')
+        ? [...Array(feature.exons.length).keys()]
+        : [...Array(feature.exons.length).keys()].reverse();
+
+    // This counter is across exons.  That means an exon might start
+    // with a light color if the last exon ended on a dark color. This
+    // is more likely to cause overlapping annotations to have shifted
+    // light dark bands relative to each other.  Not sure there is better
+    // way to assign this.
+    let aminoAcidBackdropColorCounter = 1;
+
+    for (const i of exonIndices) {
         const exon = feature.exons[i];
         const exonStart = exon.start;
         const exonEnd = exon.end;
 
-        const seqStartOffset = Math.floor(oChromStarts[i] / 3);
-        const seqEndOffset = (i + 1 < oChromStarts.length)
-            ? Math.floor(oChromStarts[i + 1] / 3)
-            : oSequence.length;
+        let bpPos = (strand === '+') ? exonStart : exonEnd;
+        const exonLimit = (strand === '+') ? exonEnd : exonStart;
+        const step = (strand === '+') ? 1 : -1;
 
-        let proteinSubsequence = oSequence.substring(seqStartOffset, seqEndOffset);
-        if (strand === '-') {
-            proteinSubsequence = proteinSubsequence.split('').reverse().join('');
-        }
 
-        let bpPos = exonStart;
-        const exonLimit = exonEnd;
-        let aminoAcidBackdropColorCounter = 1;
-
-        while (bpPos < exonLimit) {
+        while ((strand === '+' && bpPos < exonLimit) || (strand === '-' && bpPos > exonLimit)) {
             const neededBases = 3 - codonBaseRemainder;
-            const availableBases = exonLimit - bpPos;
+            const availableBases = Math.abs(exonLimit - bpPos);
             const drawBases = Math.min(neededBases, availableBases);
 
-            const bpEnd = bpPos + drawBases;
+            const bpEnd = bpPos + (drawBases * step);
             const colorToggle = aminoAcidBackdropColorCounter % 2;
+
             const aaLetter = oSequence[proteinOffset] || undefined;
+            const isRemainder = codonBaseRemainder > 0;
 
-            const isRedundant = codonBaseRemainder > 0;
+            let isMismatch = false;
+            if (sequenceInterval.hasSequence(
+                    (strand === '+') ? bpPos : bpEnd, 
+                    (strand === '+') ? bpEnd : bpPos
+                )) {
 
-            doPaint(bpPos, bpEnd, aaLetter, colorToggle, false, isRedundant);
+                const codonSeq = sequenceInterval.getSequence(
+                    (strand === '+') ? bpPos : bpEnd, 
+                    (strand === '+') ? bpEnd : bpPos
+                );
+
+                if (codonSeq && codonSeq.length === 3) {
+                    const codon = (strand === '+')
+                        ? codonSeq
+                        : complementSequence(codonSeq.split('').reverse().join(''));
+
+                    const translated = translationDict[codon];
+                    if (translated && aaLetter && translated !== aaLetter) {
+                        isMismatch = true;
+                    }
+                }
+            }
+
+            doPaint(
+                (strand === '+') ? bpPos : bpEnd,
+                (strand === '+') ? bpEnd : bpPos,
+                aaLetter, colorToggle, isMismatch, isRemainder
+            );
 
             codonBaseRemainder += drawBases;
             bpPos = bpEnd;
-            aminoAcidBackdropColorCounter++;
 
             if (codonBaseRemainder === 3) {
-                // Only now advance to the next amino acid
-                proteinOffset++;
+                aminoAcidBackdropColorCounter++;
+                proteinOffset += 1;
                 codonBaseRemainder = 0;
             }
         }
 
-        // Handle codons that span a boundary
-        if (codonBaseRemainder > 0 && i + 1 < feature.exons.length) {
-            const nextExon = feature.exons[i + 1];
+        // Redundant display across exon boundary
+        if (codonBaseRemainder > 0 &&
+            ((strand === '+' && i + 1 < feature.exons.length) ||
+             (strand === '-' && i - 1 >= 0))) {
+
+            const nextExon = (strand === '+') ? feature.exons[i + 1] : feature.exons[i - 1];
             const redundantBases = 3 - codonBaseRemainder;
-            const redundantEnd = nextExon.start + redundantBases;
+            const redundantStart = (strand === '+') ? nextExon.start : nextExon.end - redundantBases;
+            const redundantEnd = redundantStart + (redundantBases * step);
+
             const aaLetter = oSequence[proteinOffset] || undefined;
 
-            doPaint(nextExon.start, redundantEnd, aaLetter, 0, false, true);
+            doPaint(
+                (strand === '+') ? redundantStart : redundantEnd,
+                (strand === '+') ? redundantEnd : redundantStart,
+                aaLetter, 0, false, true
+            );
         }
     }
 
