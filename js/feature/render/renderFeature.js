@@ -159,13 +159,10 @@ function renderFeature(feature, bpStart, xScale, pixelHeight, ctx, options) {
                         }
 
                     // Handle bigPsl files containing translated alignments
+                    // RMH: TODO: Is this a sufficient test for aligned protein features???? Hmm..
                     }else if ( feature.oSequence !== undefined ) {
                       if (options.bpPerPixel < aminoAcidSequenceRenderThreshold &&
                             options.sequenceInterval) {
-
-                            const leftExon = i > 0 && feature.exons[i - 1].readingFrame !== undefined ? feature.exons[i - 1] : undefined
-                            const riteExon = i < feature.exons.length - 1 && feature.exons[i + 1].readingFrame !== undefined ? feature.exons[i + 1] : undefined
-
                             renderAminoAcidSequenceAligned.call(this, ctx, feature, feature.strand, bpStart, options.bpPerPixel, py, h, options.sequenceInterval)
                         }
  
@@ -523,8 +520,8 @@ function renderFeatureLabel(ctx, feature, featureX, featureX1, featureY, referen
 
         const geneFontStyle = {
             textAlign: "SLANT" === this.labelDisplayMode ? undefined : 'center',
-            fillStyle: color,
-            strokeStyle: color
+            fillStyle: this.labelColor === undefined ? color : this.labelColor,
+            strokeStyle: this.labelColor === undefined ? color : this.labelColor,
         }
 
         const textMetrics = ctx.measureText(name)
