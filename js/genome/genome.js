@@ -10,6 +10,7 @@ import {loadChromSizes} from "./chromSizes.js"
 import ChromAliasDefaults from "./chromAliasDefaults.js"
 import {igvxhr} from "../../node_modules/igv-utils/src/index.js"
 import {loadHub} from "../ucsc/hub/hubParser.js"
+import {updateReference} from "./updateReference.js"
 
 const ucsdIDMap = new Map([
     ["1kg_ref", "hg18"],
@@ -32,6 +33,7 @@ class Genome {
 
     static async createGenome(options, browser) {
 
+        updateReference(options)
         const genome = new Genome(options, browser)
         await genome.init()
         return genome
@@ -54,7 +56,6 @@ class Genome {
 
         // Load sequence
         this.sequence = await loadSequence(config, this.browser)
-
 
         // Load cytobands.  This is optional but required to support the ideogram.  Only needed for whole genome view
         if(false !== config.showIdeogram && false !== config.wholeGenomeView) {
@@ -99,10 +100,14 @@ class Genome {
                 } else {
                     this.#wgChromosomeNames = config.chromosomeOrder.split(',').map(nm => nm.trim())
                 }
+                // Trim to remove non-existent chromosomes
+                await this.chromAlias.preload(this.#wgChromosomeNames)
+                this.#wgChromosomeNames =
+                    this.#wgChromosomeNames.map(c =>  this.getChromosomeName(c)).filter(c => this.chromosomes.has(c))
             } else {
                 this.#wgChromosomeNames = trimSmallChromosomes(this.chromosomes)
+                await this.chromAlias.preload(this.#wgChromosomeNames)
             }
-            await this.chromAlias.preload(this.#wgChromosomeNames)
         }
 
         // Optionally create the psuedo chromosome "all" to support whole genome view
