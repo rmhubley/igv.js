@@ -6,6 +6,8 @@ import MergedTrack from "./feature/mergedTrack.js"
 import BAMTrack from "./bam/bamTrack.js"
 import InteractionTrack from "./feature/interactionTrack.js"
 import VariantTrack from "./variant/variantTrack.js"
+import ChainTrack from "./feature/chainTrack.js"
+import SelfPairTrack from "./feature/selfPairTrack.js"
 import QTLTrack from "./qtl/qtlTrack.js"
 import GWASTrack from "./gwas/gwasTrack.js"
 import GCNVTrack from "./gcnv/gcnvTrack.js"
@@ -24,6 +26,8 @@ const trackFunctions =
         ['ideogram', (config, browser) => new IdeogramTrack(config, browser)],
         ['sequence', (config, browser) => new SequenceTrack(config, browser)],
         ['feature', (config, browser) => new FeatureTrack(config, browser)],
+        ['chain', (config, browser) => new ChainTrack(config, browser)],
+        ['selfpair', (config, browser) => new SelfPairTrack(config, browser)],
         ['seg', (config, browser) => new SegTrack(config, browser)],
         ['mut', (config, browser) => new SegTrack(config, browser)],
         ['maf', (config, browser) => new SegTrack(config, browser)],
