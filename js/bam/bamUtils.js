@@ -303,6 +303,7 @@ const BamUtils = {
         for (i = 0; i < len; i++) {
 
             tokens = lines[i].split('\t')
+            //console.log("Decoding line tokens: " + tokens.join(", "))
 
             alignment = new BamAlignment()
 
@@ -318,6 +319,7 @@ const BamUtils = {
 
             if (alignment.chr === '*' || !alignment.isMapped()) continue  // Unmapped
 
+            //console.log("alignment.start = " + alignment.start + " min = " + min + " max = " + max)
             if (alignment.chr !== chr) {
                 if (started) break // Off the right edge, we're done
                 else continue // Possibly to the left, skip but keep looping
@@ -336,10 +338,15 @@ const BamUtils = {
             alignment.lengthOnRef = lengthOnRef
             // TODO for lh3: parse the CG:B,I tag in SAM here
 
-            if (alignment.start + lengthOnRef < min) {
-                continue    // To the left, skip and continue
-            }
-
+            //if (alignment.start + lengthOnRef < min) {
+            //    continue    // To the left, skip and continue
+            //}
+            // RMH: Harmonizing with decodeBamRecords *and* making sure
+            //      alignment.end is defined for use in the FeatureCache
+            alignment.end = alignment.start + alignment.lengthOnRef
+            if (alignment.end < min) {
+                continue // To the left, skip and continue
+            }  
 
             qualString = tokens[10]
             alignment.qual = []
@@ -359,7 +366,9 @@ const BamUtils = {
 
             this.setPairOrientation(alignment)
 
+            //console.log("filter = " + filter)
             if (undefined === filter || filter.pass(alignment)) {
+                //console.log("pushing alignment")
                 makeBlocks(alignment, cigarArray)
                 alignmentContainer.push(alignment)
             }
@@ -431,9 +440,10 @@ const BamUtils = {
             // }
             alignment.pairOrientation = tmp.join('')
         }
-    }
-}
+    },
 
+
+}
 
 /**
  * Split the alignment record into blocks as specified in the cigarArray.  Each aligned block contains

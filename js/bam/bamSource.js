@@ -32,6 +32,7 @@ import CramReader from "../cram/cramReader.js"
 import {isDataURL} from "../util/igvUtils.js"
 import {StringUtils} from "../../node_modules/igv-utils/src/index.js"
 import {inferIndexPath} from "../util/fileFormatUtils.js"
+import DfamSamWebserviceReader from "./dfamSamWebserviceReader.js"
 
 class BamSource {
 
@@ -48,6 +49,9 @@ class BamSource {
 
         if ("ga4gh" === config.sourceType) {
             throw Error("Unsupported source type 'ga4gh'")
+        } else if ("dfamsam" === config.sourceType) {
+           // RMH: Special case of a non-indexed reader for text-based SAM format
+           this.bamReader = new DfamSamWebserviceReader(config, genome)
         } else if ("pysam" === config.sourceType) {
             this.bamReader = new BamWebserviceReader(config, genome)
         } else if ("htsget" === config.sourceType) {
@@ -93,11 +97,13 @@ class BamSource {
             if (sequence) {
                 alignmentContainer.coverageMap.refSeq = sequence    // TODO -- fix this
                 alignmentContainer.sequence = sequence           // TODO -- fix this
+                //console.log("bamSource::getAlignments() 1:ac = " + JSON.stringify(alignmentContainer,null,2))
                 return alignmentContainer
             } else {
                 console.error("No sequence for: " + chr + ":" + alignmentContainer.start + "-" + alignmentContainer.end)
             }
         }
+        //console.log("bamSource::getAlignments() ac = " + JSON.stringify(alignmentContainer,null,2))
         return alignmentContainer
 
     }
